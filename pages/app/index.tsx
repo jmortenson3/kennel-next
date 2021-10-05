@@ -1,52 +1,78 @@
-import { ReactElement } from 'react';
-import { GridItem } from '@chakra-ui/react';
 import { gql } from '@apollo/client';
 import client from '../../apollo-client';
-import AppLayout from '../../components/AppLayout';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/client';
+import {
+  Heading,
+  Link,
+  HStack,
+  Box,
+  Text,
+  Flex,
+  Spacer,
+  Center,
+} from '@chakra-ui/react';
+import { AddIcon } from '@chakra-ui/icons';
+import PetCard from '../../components/PetCard';
 
 type Props = {
   user: {
     id: string;
     email: string;
+    name: string;
     pets: any[];
   };
 };
 
-const Dashboard = ({user}: Props) => {
+const Dashboard = ({ user }: Props) => {
   return (
-    <main>
-      <h1>Heya {user.email}</h1>
-    </main>
+    <Box>
+      <Heading>Heya {user.name}</Heading>
+      <Box maxW='400px' p="24px 16px">
+        <Flex>
+          <Heading size="md">My pets</Heading>
+          <Spacer />
+          <Link href='/app/add-pet'>
+            <Box bg='purple.500' borderRadius='50'>
+              <Center p="6px">
+                <AddIcon w={3} h={3} color='white' />
+              </Center>
+            </Box>
+          </Link>
+        </Flex>
+        {user.pets && (
+          <HStack align='left' p="24px 0">
+            {user.pets.map((pet) => (
+              <PetCard
+                key={pet.id}
+                id={pet.id}
+                name={pet.name}
+                birthdate={pet.birthdate}
+                species={pet.species}
+              />
+            ))}
+          </HStack>
+        )}
+      </Box>
+    </Box>
   );
 };
-
-Dashboard.getLayout = function getLayout(page: ReactElement) {
-  return (
-    <AppLayout>
-      <GridItem bg='teal'>{page}</GridItem>
-    </AppLayout>
-  );
-};
-
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const session = await getSession(ctx);
-  console.log('ssr props session', session);
   try {
-    console.log('fethcing graphql me');
     const { data } = await client.query({
       query: gql`
         query Query {
           me {
-            user {
+            id
+            email
+            name
+            pets {
               id
-              email
-              pets {
-                id
-                name
-              }
+              name
+              species
+              birthdate
             }
           }
         }
@@ -54,12 +80,11 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       context: ctx,
     });
 
-    console.log('query results');
-    console.log({data});
+    console.log('got the user from me!', data.me);
 
     return {
       props: {
-        user: data.me?.user ?? {},
+        user: data.me ?? {},
       },
     };
   } catch (err) {
@@ -71,6 +96,5 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     };
   }
 };
-
 
 export default Dashboard;

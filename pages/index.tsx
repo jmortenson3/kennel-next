@@ -3,14 +3,16 @@ import Head from 'next/head';
 import Image from 'next/image';
 import styles from '../styles/Home.module.css';
 import { Button } from '@chakra-ui/button';
+import { Link } from "@chakra-ui/react"
 
 
 const Home = () => {
   const [session, loading] = useSession();
 
-  if (session && session.accessToken && localStorage.getItem('token') !== session.accessToken) {
-    localStorage.setItem('token', session.accessToken as string);
-  }
+  // Don't need token in localStorage, it sits in cookies
+  // if (session && session.accessToken && localStorage.getItem('token') !== session.accessToken) {
+  //   localStorage.setItem('token', session.accessToken as string);
+  // }
   
   if (!session) {
     return (
@@ -33,6 +35,7 @@ const Home = () => {
       <main>
         <Button onClick={() => signOut()}>Sign out</Button>
         <h1>Hello</h1>
+        <Button background="green.200"><Link href="/app">Go to dashboard</Link></Button>
       </main>
 
       <footer className={styles.footer}>

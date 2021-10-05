@@ -12,13 +12,16 @@ const httpLink = createHttpLink({
 });
 
 const authLink = setContext(async (req, prevContext) => {
+  // token seems to not be worth storing in localStorage since next-auth manages cookies
+  // getSession pulls the session and includes the token
+  // we set that token in the auth header here
   let token: any;
   const isBrowser = typeof window !== 'undefined';
 
   const session = await getSession(prevContext);
-  console.log('session inside authLink', session);
 
   if (session && session.accessToken) {
+    console.log('-------------------------- authLink has token set in headers');
     token = session.accessToken;
     return {
       headers: {
@@ -28,27 +31,17 @@ const authLink = setContext(async (req, prevContext) => {
   }
 
   if (isBrowser) {
+    console.log("FETCHING TOKEN IN LOCALSTORAGE");
     token = localStorage.getItem('token');
   }
 
-  if (!token) {
-    const res = await fetch(`http://localhost:3000/api/auth/session`);
-    if (res.ok) {
-      const json = await res.json();
-      console.log('json res', json);
-      token = json.accessToken;
-      if (isBrowser) {
-        localStorage.setItem('token', token);
-      }
-    } else {
-      console.log('no token');
-    }
-  }
-
   if (token && isBrowser) {
+    console.log("SETTING TOKEN IN LOCALSTORAGE");
     localStorage.setItem('token', token);
   }
   
+  console.log('going to return token to the apolloClient', token);
+
   return {
     headers: {
       Authorization: token ? `Bearer ${token}` : '',

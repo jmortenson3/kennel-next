@@ -12,36 +12,37 @@ const PROVIDER_NAMES = {
 export default NextAuth({
   events: {
     async signIn({ account, user, isNewUser }) {
-      console.log('-------------- signin event ------------------');
+      // console.log('-------------- signin event ------------------');
     },
     async createUser({ email, image, name }) {
-      console.log('-------------- createUser event ------------------');
+      // console.log('-------------- createUser event ------------------');
     },
     async updateUser({ email, image, name }) {
-      console.log('-------------- updateUser event ------------------');
+      // console.log('-------------- updateUser event ------------------');
     },
     async linkAccount({ providerAccount, user }) {
-      console.log('-------------- linkAccount event ------------------');
+      // console.log('-------------- linkAccount event ------------------');
     },
     async session(message: any) {
-      console.log('-------------- session event ------------------');
+      // console.log('-------------- session event ------------------');
     },
     async signOut(message: any) {
-      console.log('-------------- signOut event ------------------');
+      // console.log('-------------- signOut event ------------------');
       if (typeof window !== 'undefined') {
-        console.log('this is in the browser');
+        // console.log('this is in the browser');
         localStorage.removeItem('token');
       } else {
         console.log('this is on the server');
       }
     },
     async error(message) {
-      console.log('-------------- error event ------------------');
+      console.log(message);
+      // console.log('-------------- error event ------------------');
     }
   },
   callbacks: {
     async signIn(user, account, profile) {
-      console.log('-------------- signin callback ------------------');
+      // console.log('-------------- signin callback ------------------');
       // console.log({user, account, profile});
       if (account.provider === PROVIDER_NAMES.github) {
         return account.accessToken != null;
@@ -49,19 +50,31 @@ export default NextAuth({
       return false;
     },
     async redirect(url, baseUrl) {
-      console.log('-------------- redirect callback ------------------');
+      // console.log('-------------- redirect callback ------------------');
       // console.log({url, baseUrl});
       return baseUrl;
     },
+    /**
+     * 
+     * @param session 
+     * @param userOrToken 
+     * @returns 
+     */
     async session(session, userOrToken) {
-      console.log('-------------- session callback ------------------');
+      // console.log('-------------- session callback ------------------');
       // console.log({session, userOrToken});
       session.accessToken = userOrToken?.accessToken;
       return session;
     },
     /**
      *
-     * @param token Decrypted JSON web token
+     * This should only figure out how to get the token and passed it to the session
+     * DO NOT CALL GraphQL queries from here if the query needs auth since the apollo client
+     * sets tokens in the context method. Repeat: apollo client context runs for each query
+     * 
+     * What should be done here? Signup and signin ONLY
+     * 
+     * @param token Decrypted JSON web token (persisted from cookies?)
      * @param user From provider (only available on sign in)
      * @param account Provider account (only available on sign in)
      * @param profile Provider profile (only available on sign in)
@@ -69,29 +82,29 @@ export default NextAuth({
      * @returns JWT that will be saved
      */
     async jwt(token, user, account, profile, isNewUser) {
-      console.log('-------------- jwt callback ------------------');
+      // console.log('-------------- jwt callback ------------------');
       // console.log({token, user, account, profile, isNewUser});
 
       const isSignInEvent = account && profile;
 
       if (!isSignInEvent) {
-        // console.log('not sign in event, returning token', token);
         return token;
       }
 
+      // sign in event from here down
       let localUser: any = {};
       if (account.provider === PROVIDER_NAMES.github) {
         localUser = {
           email: profile?.email,
-          avatar: profile?.avatar,
+          avatar: profile?.avatar_url,
           name: profile?.name,
         };
       } else {
+        console.log('SIGNIN unsupported login type, returning null token');
         return token;
       }
 
-      // console.log(localUser);
-
+      // exchange provider token for a local token
       try {
         const { data: getUserData } = await client.query({
           query: gql`
@@ -99,6 +112,8 @@ export default NextAuth({
               me(id: $email, provider: $provider, token: $token) {
                 id
                 email
+                name
+                avatar
                 accessToken
               }
             }
@@ -114,40 +129,48 @@ export default NextAuth({
 
         if (getUserData.me.id) {
           token.accessToken = getUserData.me.accessToken;
+          console.log('SIGNIN returning token from me', token);
           return token;
         }
       } catch (err) {
-        console.log(err);
+        console.log('SIGNIN lookup user', err);
       }
-
+      
+      // create local user from provider profile
       try {
         const { data: createUserData } = await client.mutate({
           mutation: gql`
             mutation AddUserMutation(
               $email: String!
+              $name: String
+              $avatar: String
               $provider: String
               $token: String
             ) {
-              addUser(email: $email, provider: $provider, token: $token) {
+              addUser(email: $email, name: $name, avatar: $avatar, provider: $provider, token: $token) {
                 id
                 email
+                name
+                avatar
                 accessToken
               }
             }
           `,
           variables: {
             email: localUser.email,
+            name: localUser.name,
+            avatar: localUser.avatar,
             provider: 'github',
             token: account?.accessToken,
           },
         });
 
-        // console.log({createUserData});
         
         token.accessToken = createUserData.addUser.accessToken;
+        console.log('SIGNIN returning token from addUser', token);
         return token;
       } catch (err) {
-        console.log(err);
+        console.log('SIGNIN create user', err);
         return token;
       }
     },
@@ -165,7 +188,6 @@ export default NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials, req) {
-        console.log(credentials);
         try {
           const { data: getUserData } = await client.query({
             query: gql`
@@ -204,12 +226,9 @@ export default NextAuth({
             },
           });
 
-          console.log(createUserData);
-
           if (createUserData.addUser.id) {
             return createUserData.addUser;
           } else {
-            console.log('returning null');
             return null;
           }
         } catch (err) {
