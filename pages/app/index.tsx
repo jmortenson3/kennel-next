@@ -2,17 +2,6 @@ import { gql } from '@apollo/client';
 import client from '../../apollo-client';
 import { GetServerSideProps } from 'next';
 import { getSession } from 'next-auth/client';
-import {
-  Heading,
-  Link,
-  HStack,
-  Box,
-  Text,
-  Flex,
-  Spacer,
-  Center,
-} from '@chakra-ui/react';
-import { AddIcon } from '@chakra-ui/icons';
 import PetCard from '../../components/PetCard';
 
 type Props = {
@@ -20,29 +9,53 @@ type Props = {
     id: string;
     email: string;
     name: string;
-    pets: any[];
+    userPets: {
+      id: string;
+      name: string;
+      species: string;
+      birthdate: string;
+    }[];
+    userBookings: {
+      id: string;
+      dropOffAt: string;
+      pickUpAt: string;
+      bookingDetails: {
+        id: string;
+        bookingDetailsPet: {
+          id: string;
+          name: string;
+        }
+      }[];
+      bookingOrganization: {
+        id: string;
+        name: string;
+      };
+      bookingLocation: {
+        id: string;
+        name: string;
+      };
+    }[];
   };
 };
 
 const Dashboard = ({ user }: Props) => {
   return (
-    <Box>
-      <Heading>Heya {user.name}</Heading>
-      <Box maxW='400px' p="24px 16px">
-        <Flex>
-          <Heading size="md">My pets</Heading>
-          <Spacer />
-          <Link href='/app/add-pet'>
-            <Box bg='purple.500' borderRadius='50'>
-              <Center p="6px">
-                <AddIcon w={3} h={3} color='white' />
-              </Center>
-            </Box>
-          </Link>
-        </Flex>
-        {user.pets && (
-          <HStack align='left' p="24px 0">
-            {user.pets.map((pet) => (
+    <div>
+      <h1>Heya {user.name}</h1>
+      <div className="max-w-md pt-6 pb-4">
+        <div className="flex">
+          <h1>My pets</h1>
+          <a href='/app/pets/add-pet'>
+            <div className="bg-purple-500 rounded-full">
+              <div className="p-2">
+                +
+              </div>
+            </div>
+          </a>
+        </div>
+        {user.userPets && (
+          <div className="flex">
+            {user.userPets.map((pet) => (
               <PetCard
                 key={pet.id}
                 id={pet.id}
@@ -51,10 +64,27 @@ const Dashboard = ({ user }: Props) => {
                 species={pet.species}
               />
             ))}
-          </HStack>
+          </div>
         )}
-      </Box>
-    </Box>
+        {user.userBookings && (
+          <div className="flex px-4">
+            {user.userBookings.map((booking) => (
+              <div className="shadow-md p-6" key={booking.id}>
+                <h4>{booking.dropOffAt ?? '?'} - {booking.pickUpAt ?? '?'}</h4>
+                <p className="font-bold">Who?</p>
+                <p>
+                {booking.bookingDetails && (booking.bookingDetails.map(bd => (
+                  bd.bookingDetailsPet.name
+                ))).join(', ')}
+                </p>
+                <p className="font-bold">Where?</p><p>Reserved with {booking.bookingOrganization?.name}</p>
+                <p>At {booking.bookingLocation?.name}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -68,19 +98,44 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
             id
             email
             name
-            pets {
+            userPets {
               id
               name
               species
               birthdate
+            }
+            userMemberships {
+              id
+              membershipOrganization {
+                id
+                name
+              }
+            }
+            userBookings {
+              id
+              dropOffAt
+              pickUpAt
+              bookingDetails {
+                id
+                bookingDetailsPet {
+                  id
+                  name
+                }
+              }
+              bookingOrganization {
+                id
+                name
+              }
+              bookingLocation {
+                id
+                name
+              }
             }
           }
         }
       `,
       context: ctx,
     });
-
-    console.log('got the user from me!', data.me);
 
     return {
       props: {
